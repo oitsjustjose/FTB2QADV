@@ -1,0 +1,8 @@
+*.snbt
+lib/
+lib64/
+lib64
+share/
+bin/
+out/
+__pycache__/
