@@ -4,7 +4,7 @@ LICENSE: MIT
 """
 
 import json
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, List
 
 from colorama import Fore
 
@@ -32,10 +32,6 @@ class Advancement:
             for dep in self.__quest["dependencies"]:
                 if dep in self.__idmp:
                     return f"{self.__namespace}:{self.__idmp[dep]}"
-        q_nm = self.get_title()
-        print(
-            f"{Fore.YELLOW}[i] Failed to detect parent for self.__quest {q_nm}{Fore.RESET}"
-        )
         return f"{self.__namespace}:root"
 
     def get_title(self) -> Union[str, Dict[str, Any]]:
@@ -45,7 +41,7 @@ class Advancement:
         """
         if "title" in self.__quest:
             try:  # some titles are json colored
-                return json.loads(self.__quest["title"])
+                return json.loads(self.__quest["title"].replace('\\"', '"'))
             except json.decoder.JSONDecodeError:
                 return self.__quest["title"]
         else:  # attempt to salvage name by fancifying the unloc name
@@ -99,17 +95,55 @@ class Advancement:
                 return task["item"]
         return "minecraft:air"
 
-    def is_valid(self) -> bool:
-        """Verifies that self is valid and doesn't have any unintended defaults"""
+    def get_validation_errors(self) -> List[str]:
+        """
+        Verifies that self is valid and doesn't have any unintended defaults
+        Returns a string list of individual validation errors
+        """
+        ret: List[str] = []
         if self.get_parent() == "minecraft:root":
-            return False
+            ret.append("Parent could not be determined. Defaulted to 'minecraft:root'")
         if self.get_icon_item() == "minecraft:air":
-            return False
+            ret.append("Icon could not be determined. Defaulted to 'minecraft:air")
         if self.get_title() == self.__quest["id"]:
-            return False
+            ret.append(
+                f"Advancement Name could not be determined. Defaulted to '{self.__quest['id']}'"
+            )
         if not self.get_description():
-            return False
-        return self.get_criteria() != "minecraft:air"
+            ret.append("Description could not be parsed. Defaulted to ''")
+        if self.get_criteria() == "minecraft:air":
+            # Determine the root of the issue
+            if "tasks" not in self.__quest:
+                ret.append("Quest has no tasks. Defaulted Criteria to 'minecraft:air'")
+            else:
+                has_normal_item = False
+                has_non_item = False
+                has_complex_item = False
+                for task in self.__quest["tasks"]:
+                    if "item" not in task:
+                        has_non_item = True
+                    elif isinstance(task["item"], str):
+                        has_normal_item = True
+                    else:
+                        has_complex_item = True
+
+                if not has_normal_item:  # is immediately invalid
+                    if has_non_item:
+                        if (
+                            has_complex_item
+                        ):  # Has mix of Non-Item tasks and Tasks with NBT
+                            ret.append(
+                                "Quest only has mix of Task(s) with Complex Items with NBT and Non-Item-Based Tasks. Defaulted Criteria to 'minecraft:air'"
+                            )
+                        else:  # Only has Non-Item Tasks
+                            ret.append(
+                                "Quest only has Task(s) which are Non-Item-Based. Defaulted Criteria to 'minecraft:air'"
+                            )
+                    elif has_complex_item:  # Only has NBT Item Tasks
+                        ret.append(
+                            "Quest only has Task(s) which contain Items that specify NBT. Defaulted Criteria to 'minecraft:air'"
+                        )
+        return ret
 
     def to_json(self) -> Dict[str, Any]:
         """Returns self as json"""

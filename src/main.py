@@ -7,11 +7,11 @@ import json
 import os
 from typing import Any, Dict
 
+import snbtlib
 from colorama import Fore
 
+from advancement import Advancement
 from param_parser import CommandlineConfigParser
-from quest_utils import Advancement
-from snbt_fixer import get_fixed_snbt_dict
 
 Json: type = Dict[str, Any]
 
@@ -21,7 +21,8 @@ def main(parmesan: CommandlineConfigParser) -> None:
     infile = parmesan.get_argument("input")
     namespace = parmesan.get_argument("namespace") or "minecraft"
 
-    data = get_fixed_snbt_dict(infile)
+    with open(infile, "r", encoding="utf-8") as file_handle:
+        data: Json = snbtlib.loads(file_handle.read())  # type: ignore
 
     idmp = build_id_filename_mapping(data)
     for quest in data["quests"]:
@@ -42,10 +43,14 @@ def main(parmesan: CommandlineConfigParser) -> None:
 def create_adv_from_quest(quest: Json, namespace: str, idmp: Dict[str, str]) -> Json:
     """Creates an advancement from a singular quest"""
     adv = Advancement(quest, namespace, idmp)
-    if not adv.is_valid():
+    errors = adv.get_validation_errors()
+    if errors:
+        print(f"\n{'-'*os.get_terminal_size().columns}\n")
         print(
-            f"{Fore.YELLOW}FTB Quest with ID {quest['id']} (in {idmp[quest['id']]}.json) has validation errors. Still creating advancement but requires manual verification{Fore.RESET}"
+            f"{Fore.YELLOW}[i] Validation Errors for Quest '{idmp[quest['id']]}' were found:{Fore.RESET}"
         )
+        for error in errors:
+            print(f"    • {error}")
     return adv.to_json()
 
 
@@ -58,7 +63,9 @@ def build_id_filename_mapping(data: Json) -> Dict[str, str]:
         # user-defined title
         if "title" in quest:
             try:  # some titles are json colored
-                file_name_root: str = json.loads(quest["title"])["text"]
+                file_name_root: str = json.loads(quest["title"].replace('\\"', '"'))[
+                    "text"
+                ]
             except json.decoder.JSONDecodeError:
                 file_name_root = quest["title"]
         else:
