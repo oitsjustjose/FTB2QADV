@@ -77,9 +77,9 @@ class Advancement:
         """
         if "description" in self.__quest:
             return (
-                " ".join(self.__quest["description"])
+                " ".join(filter(lambda x: x, self.__quest["description"]))
                 .replace("&", "§")
-                .replace("  ", " ")
+                .replace("\\\\§", "&")
             )
         return ""
 
