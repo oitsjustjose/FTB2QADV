@@ -36,6 +36,8 @@ def main(parmesan: CommandlineConfigParser) -> None:
                 .replace("\\\\\\u00a7", "&")
                 # Fix \u00a7 -> §
                 .replace("\\u00a7", "§")
+                # Fix \\\ -> \
+                .replace("\\\\\\", "\\")
             )
             file_handle.write(data_as_str)
 

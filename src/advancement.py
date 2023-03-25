@@ -34,7 +34,7 @@ class Advancement:
                     return f"{self.__namespace}:{self.__idmp[dep]}"
         return f"{self.__namespace}:root"
 
-    def get_title(self) -> Union[str, Dict[str, Any]]:
+    def get_title(self) -> Dict[str, Any]:
         """
         Attempts to get the title of a self.__quest.
         Returns the self.__quest ID as fallback
@@ -43,17 +43,17 @@ class Advancement:
             try:  # some titles are json colored
                 return json.loads(self.__quest["title"].replace('\\"', '"'))
             except json.decoder.JSONDecodeError:
-                return self.__quest["title"]
+                return {"text": self.__quest["title"]}
         else:  # attempt to salvage name by fancifying the unloc name
             for task in self.__quest["tasks"]:
                 if "item" in task and isinstance(task["item"], str):
                     name = task["item"].split(":")[1].split("_")
                     name = " ".join(map(lambda x: x[0].upper() + x[1:], name))
-                    return name
+                    return {"text": name}
         print(
             f"{Fore.YELLOW}[i] Failed to detect advancement name from self.__quest {self.__quest['id']}{Fore.RESET}"
         )
-        return f"{self.__quest['id']}"
+        return {"text": self.__quest["id"]}
 
     def get_icon_item(self) -> str:
         """
@@ -101,11 +101,12 @@ class Advancement:
         Returns a string list of individual validation errors
         """
         ret: List[str] = []
+        title = self.get_title()
         if self.get_parent() == "minecraft:root":
             ret.append("Parent could not be determined. Defaulted to 'minecraft:root'")
         if self.get_icon_item() == "minecraft:air":
             ret.append("Icon could not be determined. Defaulted to 'minecraft:air")
-        if self.get_title() == self.__quest["id"]:
+        if "text" not in title or title["text"] == self.__quest["id"]:
             ret.append(
                 f"Advancement Name could not be determined. Defaulted to '{self.__quest['id']}'"
             )
@@ -151,12 +152,12 @@ class Advancement:
             "parent": self.get_parent(),
             "display": {
                 "icon": {"item": self.get_icon_item()},
-                "title": {"text": self.get_title()},
+                "title": self.get_title(),
                 "description": {"text": self.get_description()},
             },
             "criteria": {
                 "0": {
-                    "conditions": {"items": [{"items": [[self.get_criteria()]]}]},
+                    "conditions": {"items": [{"items": [self.get_criteria()]}]},
                     "trigger": "minecraft:inventory_changed",
                 }
             },
